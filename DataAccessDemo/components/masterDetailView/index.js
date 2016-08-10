@@ -1,18 +1,18 @@
 'use strict';
 
-app.home = kendo.observable({
+app.masterDetailView = kendo.observable({
     onShow: function() {},
     afterShow: function() {}
 });
 
-// START_CUSTOM_CODE_home
+// START_CUSTOM_CODE_masterDetailView
 // Add custom code here. For more information about custom code, see http://docs.telerik.com/platform/screenbuilder/troubleshooting/how-to-keep-custom-code-changes
 
-// END_CUSTOM_CODE_home
+// END_CUSTOM_CODE_masterDetailView
 (function(parent) {
-    var dataProvider = app.data.dataAccessDemo,
+    var dataProvider = app.data.progressDataProvider,
         fetchFilteredData = function(paramFilter, searchFilter) {
-            var model = parent.get('homeModel'),
+            var model = parent.get('masterDetailViewModel'),
                 dataSource = model.get('dataSource');
 
             if (paramFilter) {
@@ -34,55 +34,20 @@ app.home = kendo.observable({
         },
         processImage = function(img) {
 
-            function isAbsolute(img) {
-                if  (img && (img.slice(0,  5)  ===  'http:' || img.slice(0,  6)  ===  'https:' || img.slice(0,  2)  ===  '//'  ||  img.slice(0,  5)  ===  'data:')) {
-                    return true;
-                }
-                return false;
-            }
-
             if (!img) {
                 var empty1x1png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVQI12NgYAAAAAMAASDVlMcAAAAASUVORK5CYII=';
                 img = 'data:image/png;base64,' + empty1x1png;
-            } else if (!isAbsolute(img)) {
-                var setup = dataProvider.setup || {};
-                img = setup.scheme + ':' + setup.url + setup.appId + '/Files/' + img + '/Download';
             }
 
             return img;
         },
-        flattenLocationProperties = function(dataItem) {
-            var propName, propValue,
-                isLocation = function(value) {
-                    return propValue && typeof propValue === 'object' &&
-                        propValue.longitude && propValue.latitude;
-                };
-
-            for (propName in dataItem) {
-                if (dataItem.hasOwnProperty(propName)) {
-                    propValue = dataItem[propName];
-                    if (isLocation(propValue)) {
-                        dataItem[propName] =
-                            kendo.format('Latitude: {0}, Longitude: {1}',
-                                propValue.latitude, propValue.longitude);
-                    }
-                }
-            }
+        jsdoOptions = {
+            name: 'Customer',
+            autoFill: false
         },
         dataSourceOptions = {
-            type: 'everlive',
-            transport: {
-                typeName: 'SQLCustomers',
-                dataProvider: dataProvider
-            },
-            change: function(e) {
-                var data = this.data();
-                for (var i = 0; i < data.length; i++) {
-                    var dataItem = data[i];
-
-                    flattenLocationProperties(dataItem);
-                }
-            },
+            type: 'jsdo',
+            transport: {},
             error: function(e) {
 
                 if (e.xhr) {
@@ -92,8 +57,8 @@ app.home = kendo.observable({
             schema: {
                 model: {
                     fields: {
-                        'CompanyName': {
-                            field: 'CompanyName',
+                        'Name': {
+                            field: 'Name',
                             defaultValue: ''
                         },
                     }
@@ -102,15 +67,19 @@ app.home = kendo.observable({
             serverFiltering: true,
             serverSorting: true,
             sort: {
-                field: 'CompanyName',
+                field: '_errorString',
                 dir: 'asc'
             },
         },
-        dataSource = new kendo.data.DataSource(dataSourceOptions),
+        dataSource = new kendo.data.DataSource({
+            pageSize: 50
+        }),
         // start data sources
         // end data sources
-        homeModel = kendo.observable({
+        masterDetailViewModel = kendo.observable({
             dataSource: dataSource,
+            _dataSourceOptions: dataSourceOptions,
+            _jsdoOptions: jsdoOptions,
             fixHierarchicalData: function(data) {
                 var result = {},
                     layout = {};
@@ -159,26 +128,26 @@ app.home = kendo.observable({
                 return result;
             },
             itemClick: function(e) {
-                var dataItem = e.dataItem || homeModel.originalItem;
+                var dataItem = e.dataItem || masterDetailViewModel.originalItem;
 
-                app.mobileApp.navigate('#components/home/details.html?uid=' + dataItem.uid);
+                app.mobileApp.navigate('#components/masterDetailView/details.html?uid=' + dataItem.uid);
 
             },
             detailsShow: function(e) {
-                homeModel.setCurrentItemByUid(e.view.params.uid);
+                masterDetailViewModel.setCurrentItemByUid(e.view.params.uid);
             },
             setCurrentItemByUid: function(uid) {
                 var item = uid,
-                    dataSource = homeModel.get('dataSource'),
+                    dataSource = masterDetailViewModel.get('dataSource'),
                     itemModel = dataSource.getByUid(item);
 
-                if (!itemModel.CompanyName) {
-                    itemModel.CompanyName = String.fromCharCode(160);
+                if (!itemModel.Name) {
+                    itemModel.Name = String.fromCharCode(160);
                 }
 
-                homeModel.set('originalItem', itemModel);
-                homeModel.set('currentItem',
-                    homeModel.fixHierarchicalData(itemModel));
+                masterDetailViewModel.set('originalItem', itemModel);
+                masterDetailViewModel.set('currentItem',
+                    masterDetailViewModel.fixHierarchicalData(itemModel));
 
                 return itemModel;
             },
@@ -200,10 +169,10 @@ app.home = kendo.observable({
 
     if (typeof dataProvider.sbProviderReady === 'function') {
         dataProvider.sbProviderReady(function dl_sbProviderReady() {
-            parent.set('homeModel', homeModel);
+            parent.set('masterDetailViewModel', masterDetailViewModel);
         });
     } else {
-        parent.set('homeModel', homeModel);
+        parent.set('masterDetailViewModel', masterDetailViewModel);
     }
 
     parent.set('onShow', function(e) {
@@ -222,12 +191,34 @@ app.home = kendo.observable({
             }
         }
 
-        fetchFilteredData(param);
+        dataProvider.loadCatalogs().then(function _catalogsLoaded() {
+            var jsdoOptions = masterDetailViewModel.get('_jsdoOptions'),
+                jsdo = new progress.data.JSDO(jsdoOptions),
+                dataSourceOptions = masterDetailViewModel.get('_dataSourceOptions'),
+                dataSource;
+
+            dataSourceOptions.transport.jsdo = jsdo;
+            dataSource = new kendo.data.DataSource(dataSourceOptions);
+            masterDetailViewModel.set('dataSource', dataSource);
+
+            fetchFilteredData(param);
+        });
     });
 
-})(app.home);
+})(app.masterDetailView);
 
-// START_CUSTOM_CODE_homeModel
+// START_CUSTOM_CODE_masterDetailViewModel
 // Add custom code here. For more information about custom code, see http://docs.telerik.com/platform/screenbuilder/troubleshooting/how-to-keep-custom-code-changes
 
-// END_CUSTOM_CODE_homeModel
+// you can handle the beforeFill / afterFill events here. For example:
+/*
+app.masterDetailView.masterDetailViewModel.get('_jsdoOptions').events = {
+    'beforeFill' : [ {
+        scope : app.masterDetailView.masterDetailViewModel,
+        fn : function (jsdo, success, request) {
+            // beforeFill event handler statements ...
+        }
+    } ]
+};
+*/
+// END_CUSTOM_CODE_masterDetailViewModel

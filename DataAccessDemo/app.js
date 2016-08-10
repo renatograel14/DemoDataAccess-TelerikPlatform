@@ -10,28 +10,8 @@
             app.mobileApp = new kendo.mobile.Application(document.body, {
                 transition: 'slide',
                 skin: 'nova',
-                initial: 'components/home/view.html'
             });
         });
-    };
-
-    $(document).ready(function(){
-        var navigationShowMoreView = $('#navigation-show-more-view').find('ul'),
-            allItems = $('#navigation-container-more').find('a'),
-            navigationShowMoreContent='';
-
-
-            allItems.each(function(index) {
-                navigationShowMoreContent += '<li>' + allItems[index].outerHTML + '</li>';
-            });
-
-             navigationShowMoreView.html(navigationShowMoreContent);
-    });
-
-
-    app.listViewClick = function _listViewClick(item) {
-        var tabstrip = app.mobileApp.view().footer.find('.km-tabstrip').data('kendoMobileTabStrip');
-        tabstrip.clear();
     };
 
     if (window.cordova) {
